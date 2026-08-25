@@ -3,6 +3,9 @@ from datetime import time
 
 async def ainput(prompt_text=""):
     window = __import__("js").window
+    if "date" in prompt_text.lower() or "aaaa" in prompt_text.lower():
+        value = await window.promptDateConsoleAsync(prompt_text)
+        return str(value).replace("-", "/")
     return str(await window.promptUserConsoleAsync(prompt_text))
 
 class Dayoff:
@@ -177,6 +180,5 @@ def isFriday(date:datetime.date) -> bool:
         return True
     else:
         return False
-
 
 

@@ -102,5 +102,9 @@ for event in eventList:
         e.make_all_day()
     c.events.add(e)
 
+calendar_data = c.serialize()
 with open('calendar.ics', 'w') as file:
-    file.writelines(c.serialize())
+    file.write(calendar_data)
+
+window = __import__("js").window
+window.downloadFile("calendar.ics", calendar_data, "text/calendar")

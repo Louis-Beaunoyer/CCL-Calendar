@@ -12,6 +12,15 @@
         #input-line { display: flex; margin-top: 10px; align-items: center; gap: 8px; }
         #prompt { color: #00ff00; font-weight: bold; margin-right: 2px; }
         #code-input { flex-grow: 1; background: transparent; border: none; color: #fff; font-family: monospace; outline: none; font-size: 14px; }
+        #code-input[type="date"] { flex-grow: 1; width: auto; min-width: 0; color-scheme: dark; color: #fff; }
+        #code-input[type="date"]::-webkit-calendar-picker-indicator {
+            width: 24px;
+            height: 24px;
+            transform: scale(1.25);
+            opacity: 1;
+            cursor: pointer;
+        }
+
 
          /* Mobile-friendly Run Button */
         #run-btn { background-color: #00ff00; color: #000; border: none; font-family: monospace; font-weight: bold; font-size: 16px; padding: 12px 20px; border-radius: 4px; cursor: pointer; transition: background 0.2s; -webkit-tap-highlight-color: transparent; }
@@ -37,6 +46,38 @@
         const outputDiv = document.getElementById('output');
         const inputField = document.getElementById('code-input');
         let pendingInputResolve = null;
+        let pendingInputType = 'text';
+        
+
+        function triggerDownload(filename, content, mimeType = 'text/plain') {
+            const blob = new Blob([content], { type: mimeType });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(link.href);
+        }
+
+        window.downloadFile = triggerDownload;
+
+        function submitPendingInput() {
+            if (!pendingInputResolve || !inputField.value.trim()) return false;
+
+            const rawValue = inputField.value;
+            const value = pendingInputType === 'date'
+                ? rawValue.replace(/-/g, '/')
+                : rawValue;
+            pendingInputResolve(value);
+            pendingInputResolve = null;
+            pendingInputType = 'text';
+            inputField.value = '';
+            inputField.type = 'text';
+            runButton.textContent = 'Run';
+            printToConsole(`&gt;&gt;&gt; ${value}`, "#fff");
+            return true;
+        }
 
         function setupStdout() {
             pyodide.runPython(`
@@ -151,17 +192,26 @@
                 micropip.destroy();
                 printToConsole("Configuring Python input...<br>", "#e6a23c");
 
-                window.promptUserConsoleAsync = function(promptText) {
+                function requestConsoleInput(promptText, inputType) {
                     const label = promptText ? String(promptText) : "";
                     if (label) {
                         printToConsole(`<br>${label}`, "#e6a23c");
                     }
+                    inputField.type = inputType;
+                    pendingInputType = inputType;
                     inputField.disabled = false;
+                    runButton.disabled = false;
+                    runButton.textContent = 'Entrer';
                     inputField.focus();
                     return new Promise((resolve) => {
                         pendingInputResolve = resolve;
                     });
-                };
+                }
+
+                window.promptUserConsoleAsync = (promptText) =>
+                    requestConsoleInput(promptText, "text");
+                window.promptDateConsoleAsync = (promptText) =>
+                    requestConsoleInput(promptText, "date");
 
                 pyodide.runPython(`
                     import builtins
@@ -250,13 +300,7 @@
                 const code = inputField.value;
                 if (!code.trim()) return;
 
-                if (pendingInputResolve) {
-                    pendingInputResolve(code);
-                    pendingInputResolve = null;
-                    inputField.value = '';
-                    printToConsole(`&gt;&gt;&gt; ${code}`, "#fff");
-                    return;
-                }
+                if (submitPendingInput()) return;
 
                 printToConsole(`<br><span style="color: #00ff00;">&gt;&gt;&gt; ${code}</span>`);
                 inputField.value = '';
@@ -276,6 +320,7 @@
         });
 
         runButton.addEventListener('click', () => {
+            if (submitPendingInput()) return;
             const enterEvent = new KeyboardEvent('keydown', { key: 'Enter' });
             inputField.dispatchEvent(enterEvent);
         });
