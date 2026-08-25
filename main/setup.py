@@ -1,4 +1,6 @@
 from calendar_utilities.utilities import *
+import ics
+
 
 
 yearDateLimits = askForYearDateLimits()
@@ -90,6 +92,16 @@ while i <= daysInSchoolYear:
     dayNumberIncrement = dayNumberIncrement + 1
     i = i + 1
 
+e = ics.Event()
+c = ics.Calendar()
+for event in eventList:
+    e.name = event.name
+    e.begin = event.dtstart
+    e.end = event.dtend
+    if event.isAllDay:
+        e.make_all_day()
+    c.events.add(e)
 
-
+with open('calendar.ics', 'w') as file:
+    file.writelines(c.serialize())
 
