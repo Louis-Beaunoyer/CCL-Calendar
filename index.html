@@ -5,74 +5,272 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Web Python Console</title>
     <!-- Load Pyodide -->
-    <script src="https://jsdelivr.net"></script>
+    <script src="./pyodide/pyodide.js"></script>
     <style>
-        body { font-family: monospace; background-color: #1e1e1e; color: #ffffff; padding: 20px; }
-        #console { width: 100%; height: 300px; background: #000; overflow-y: scroll; padding: 10px; box-sizing: border-box; }
-        #input-line { display: flex; margin-top: 10px; }
-        #prompt { color: #00ff00; margin-right: 10px; }
-        #code-input { flex-grow: 1; background: transparent; border: none; color: #fff; font-family: monospace; outline: none; }
+        body { font-family: monospace; background-color: #1e1e1e; color: #ffffff; padding: 20px; margin: 0; box-sizing: border-box; }
+        #console { width: 100%; height: 300px; background: #000; overflow-y: scroll; padding: 10px; box-sizing: border-box; border-radius: 5px; }
+        #input-line { display: flex; margin-top: 10px; align-items: center; gap: 8px; }
+        #prompt { color: #00ff00; font-weight: bold; margin-right: 2px; }
+        #code-input { flex-grow: 1; background: transparent; border: none; color: #fff; font-family: monospace; outline: none; font-size: 14px; }
+
+         /* Mobile-friendly Run Button */
+        #run-btn { background-color: #00ff00; color: #000; border: none; font-family: monospace; font-weight: bold; font-size: 16px; padding: 12px 20px; border-radius: 4px; cursor: pointer; transition: background 0.2s; -webkit-tap-highlight-color: transparent; }
+        #run-btn:hover { background-color: #00cc00; }
+        #run-btn:disabled { background-color: #444; color: #888; cursor: not-allowed; }
     </style>
 </head>
 <body>
 
     <h1>Interactive Python Console</h1>
     <div id="console">
-        <div id="output">Loading Python environment (Pyodide)... Please wait.</div>
+        <div id="output">Loading Python environment (Pyodide)... Please wait.<br></div>
     </div>
     <div id="input-line">
         <span id="prompt">&gt;&gt;&gt;</span>
         <input type="text" id="code-input" disabled autocomplete="off">
+        <button id="run-btn" disabled>Run</button>
     </div>
 
     <script>
         let pyodide;
+        const runButton = document.getElementById('run-btn');
         const outputDiv = document.getElementById('output');
         const inputField = document.getElementById('code-input');
 
-        // Initialize Pyodide
-        async function main() {
-            pyodide = await loadPyodide();
-            outputDiv.innerHTML += "<br>Python ready! Type your code below.<br>";
-            inputField.disabled = false;
-            inputField.focus();
+        function setupStdout() {
+            pyodide.runPython(`
+            import sys
+            import io
+            sys.stdout = io.StringIO()
+            `);
         }
+        function printToConsole(text, color = "#fff") {
+            const message = String(text).replace(/\n/g, '<br>');
+            outputDiv.innerHTML += `<span style="color: ${color};">${message}</span>`;
+            const consoleDiv = document.getElementById('console');
+            consoleDiv.scrollTop = consoleDiv.scrollHeight;
+        }
+
+        function formatError(error) {
+            const candidates = [
+                error && error.stack,
+                error && error.message,
+                error && typeof error.toString === "function" ? error.toString() : null
+            ];
+
+            for (const candidate of candidates) {
+                if (candidate === null || candidate === undefined) continue;
+                const message = String(candidate);
+                if (message && message !== "[object Object]") return message;
+            }
+
+            if (error && typeof error === "object") {
+                const details = Object.keys(error)
+                    .map((key) => `${key}: ${String(error[key])}`)
+                    .join("\n");
+                if (details) return details;
+            }
+
+            return String(error);
+        }
+
+        async function fetchText(path) {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 10000);
+            try {
+                const response = await fetch(`./${path}`, { signal: controller.signal });
+                if (!response.ok) throw new Error(`${path} returned HTTP ${response.status}`);
+                return await response.text();
+            } catch (error) {
+                if (error.name === "AbortError") {
+                    throw new Error(`Timed out loading ${path}. Check that the page is served from http://localhost:8000.`);
+                }
+                throw error;
+            } finally {
+                clearTimeout(timeout);
+            }
+        }
+
+        // Helper function to safely mount folder layouts and populate files recursively
+        async function loadVirtualPackage(baseDir, filesList) {
+            for (const path of filesList) {
+                try {
+                    const parts = path.split('/');
+                    if (parts.length > 1) {
+                        let currentPath = baseDir;
+                        for (let i = 0; i < parts.length - 1; i++) {
+                            currentPath += '/' + parts[i];
+                            try { pyodide.FS.mkdir(currentPath); } catch(e) {}
+                        }
+                    }
+
+                    const fileResponse = await fetch(`./${baseDir}/${path}`);
+                    if (fileResponse.ok) {
+                        const fileCode = await fileResponse.text();
+                        pyodide.FS.writeFile(`${baseDir}/${path}`, fileCode);
+                    }
+                } catch(e) {
+                    // Fail silently for optional package structures
+                }
+            }
+        }
+
+        // Initialize Pyodide using the local bundled runtime.
+        async function main() {
+            try {
+                if (window.location.protocol === "file:") {
+                    throw new Error(
+                        "This page must be opened through a web server. " +
+                        "Run .venv\\Scripts\\python.exe -m http.server 8000, then open http://localhost:8000/index.html."
+                    );
+                }
+
+                pyodide = await loadPyodide({ indexURL: "./pyodide/" });
+                printToConsole("Python environment loaded successfully!<br>", "#00ff00");
+                printToConsole("Loading bundled Python dependencies...<br>", "#e6a23c");
+                const bundledPackages = [
+                    "attrs-26.1.0-py3-none-any.whl",
+                    "python_dateutil-2.9.0.post0-py2.py3-none-any.whl",
+                    "six-1.17.0-py2.py3-none-any.whl"
+                ].map((filename) => new URL(`./pyodide/${filename}`, document.baseURI).href);
+                await pyodide.loadPackage(bundledPackages);
+                printToConsole("Loading calendar parser dependencies...<br>", "#e6a23c");
+                const micropipUrl = new URL(
+                    "./pyodide/micropip-0.11.1-py3-none-any.whl",
+                    document.baseURI
+                ).href;
+                await pyodide.loadPackage(micropipUrl);
+                const micropip = pyodide.pyimport("micropip");
+                try {
+                    await micropip.uninstall("tatsu");
+                } catch (error) {
+                    // Tatsu is not installed on the first run.
+                }
+                await micropip.install(["arrow", "tatsu==4.4.0"]);
+                micropip.destroy();
+                printToConsole("Configuring Python input...<br>", "#e6a23c");
+
+                // Required so the browser can prompt for input during script execution.
+                window.promptUserConsole = function(promptText) {
+                    const label = promptText ? String(promptText) : "";
+                    if (label) {
+                        printToConsole(`<br><span style="color: #e6a23c;">${label}</span>`);
+                    }
+
+                    const userInput = prompt(label) ?? "";
+                    if (userInput) {
+                        printToConsole(`<span style="color: #ffffff;"> ${userInput}</span>`);
+                    }
+                    return userInput;
+                };
+
+                pyodide.runPython(`
+                    import builtins
+                    from js import window
+                    def custom_input(prompt_text=""):
+                        return str(window.promptUserConsole(prompt_text))
+                    builtins.input = custom_input
+                `);
+
+                pyodide.runPython(`
+                    import collections
+                    import collections.abc
+                    import sys
+                    collections.Mapping = collections.abc.Mapping
+                    collections.MutableMapping = collections.abc.MutableMapping
+                    collections.Callable = collections.abc.Callable
+                    sys.path.insert(0, "/")
+                    sys.path.insert(0, "")
+                `);
+
+                // Load the actual project modules into the in-browser filesystem.
+                printToConsole("Loading calendar package files...<br>", "#e6a23c");
+                const icsFiles = [
+                    'ics/__init__.py', 'ics/__meta__.py', 'ics/attendee.py', 'ics/component.py',
+                    'ics/event.py', 'ics/icalendar.py', 'ics/timeline.py', 'ics/todo.py', 'ics/tools.py',
+                    'ics/types.py', 'ics/utils.py',
+                    'ics/alarm/__init__.py', 'ics/alarm/audio.py', 'ics/alarm/base.py', 'ics/alarm/custom.py',
+                    'ics/alarm/display.py', 'ics/alarm/email.py', 'ics/alarm/none.py', 'ics/alarm/utils.py',
+                    'ics/grammar/__init__.py', 'ics/grammar/contentline.ebnf', 'ics/grammar/contentline.py',
+                    'ics/grammar/parse.py',
+                    'ics/parsers/alarm_parser.py', 'ics/parsers/attendee_parser.py',
+                    'ics/parsers/event_parser.py', 'ics/parsers/icalendar_parser.py', 'ics/parsers/parser.py',
+                    'ics/parsers/todo_parser.py',
+                    'ics/serializers/serializer.py',
+                    'ics/serializers/alarm_serializer.py', 'ics/serializers/attendee_serializer.py',
+                    'ics/serializers/event_serializer.py', 'ics/serializers/icalendar_serializer.py',
+                    'ics/serializers/todo_serializer.py'
+                ];
+
+                try { pyodide.FS.mkdir('ics'); } catch (e) {}
+                try { pyodide.FS.mkdir('ics/parsers'); } catch (e) {}
+                try { pyodide.FS.mkdir('ics/serializers'); } catch (e) {}
+                pyodide.FS.writeFile('ics/parsers/__init__.py', '');
+                pyodide.FS.writeFile('ics/serializers/__init__.py', '');
+
+                for (const [index, relPath] of icsFiles.entries()) {
+                    printToConsole(`Loading ${index + 1}/${icsFiles.length}: ${relPath}<br>`, "#888");
+                    const parts = relPath.split('/');
+                    let dirPath = '';
+                    for (let i = 0; i < parts.length - 1; i++) {
+                        dirPath = dirPath ? `${dirPath}/${parts[i]}` : parts[i];
+                        try { pyodide.FS.mkdir(dirPath); } catch (e) {}
+                    }
+
+                    pyodide.FS.writeFile(relPath, await fetchText(relPath));
+                }
+
+                printToConsole("Loading calendar utilities...<br>", "#e6a23c");
+                try { pyodide.FS.mkdir('calendar_utilities'); } catch (e) {}
+                pyodide.FS.writeFile('calendar_utilities/__init__.py', '');
+
+                pyodide.FS.writeFile('calendar_utilities/utilities.py', await fetchText('calendar_utilities/utilities.py'));
+
+                const pythonCode = await fetchText('main/setup.py');
+
+                printToConsole("Running setup.py...<br><br>", "#e6a23c");
+                setupStdout();
+                await pyodide.runPythonAsync(pythonCode);
+
+                const stdout = pyodide.runPython("sys.stdout.getvalue()");
+                if (stdout) printToConsole(stdout);
+                printToConsole("<br>--- Script finished execution. Console is ready ---<br>", "#00ff00");
+
+                inputField.disabled = false;
+                runButton.disabled = false;
+                if (window.innerWidth > 768) inputField.focus();
+            } catch (err) {
+                printToConsole(`<br><span style="color: #ff0000;">${formatError(err)}</span>`, "#ff0000");
+            }
+        }
+
         main();
 
-        // Capture input and execute it
         inputField.addEventListener('keydown', async (e) => {
             if (e.key === 'Enter') {
                 const code = inputField.value;
                 if (!code.trim()) return;
 
-                outputDiv.innerHTML += `<br><span style="color: #00ff00;">&gt;&gt;&gt; ${code}</span>`;
+                printToConsole(`<br><span style="color: #00ff00;">&gt;&gt;&gt; ${code}</span>`);
                 inputField.value = '';
 
                 try {
-                    // Redirect standard output to our console
-                    pyodide.runPython(`
-                        import sys
-                        import io
-                        sys.stdout = io.StringIO()
-                    `);
-
-                    // Evaluate code
-                    let result = await pyodide.runPythonAsync(code);
-
-                    // Get printed text
-                    let stdout = pyodide.runPython("sys.stdout.getvalue()");
-
-                    if (stdout) outputDiv.innerHTML += `<br>${stdout.replace(/\n/g, '<br>')}`;
-                    if (result !== undefined) outputDiv.innerHTML += `<br>${result}`;
-
+                    setupStdout();
+                    const result = await pyodide.runPythonAsync(code);
+                    const stdout = pyodide.runPython("sys.stdout.getvalue()");
+                    if (stdout) printToConsole(`<br>${stdout}`);
+                    if (result !== undefined) {
+                        printToConsole(`<br><span style="color: #a6e22e;">${result}</span>`);
+                    }
                 } catch (err) {
-                    outputDiv.innerHTML += `<br><span style="color: #ff0000;">${err}</span>`;
+                    printToConsole(`<br><span style="color: #ff0000;">${formatError(err)}</span>`);
                 }
-
-                // Auto-scroll to bottom
-                const consoleDiv = document.getElementById('console');
-                consoleDiv.scrollTop = consoleDiv.scrollHeight;
             }
+        });
+
+        runButton.addEventListener('click', () => {
+            const enterEvent = new KeyboardEvent('keydown', { key: 'Enter' });
+            inputField.dispatchEvent(enterEvent);
         });
     </script>
 </body>
