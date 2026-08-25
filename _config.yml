@@ -1,0 +1,5 @@
+include:
+  - ics
+  - calendar_utilities
+  - main
+  - pyodide
