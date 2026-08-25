@@ -26,6 +26,8 @@
         #run-btn { background-color: #00ff00; color: #000; border: none; font-family: monospace; font-weight: bold; font-size: 16px; padding: 12px 20px; border-radius: 4px; cursor: pointer; transition: background 0.2s; -webkit-tap-highlight-color: transparent; }
         #run-btn:hover { background-color: #00cc00; }
         #run-btn:disabled { background-color: #444; color: #888; cursor: not-allowed; }
+        #stop-btn { display: none; background-color: #ff5555; color: #fff; border: none; font-family: monospace; font-weight: bold; font-size: 16px; padding: 12px 20px; border-radius: 4px; cursor: pointer; }
+        #stop-btn:hover { background-color: #dd3333; }
     </style>
 </head>
 <body>
@@ -38,6 +40,7 @@
         <span id="prompt">&gt;&gt;&gt;</span>
         <input type="text" id="code-input" disabled autocomplete="off">
         <button id="run-btn" disabled>Run</button>
+        <button id="stop-btn" type="button">Stop</button>
     </div>
 
     <script>
@@ -45,8 +48,10 @@
         const runButton = document.getElementById('run-btn');
         const outputDiv = document.getElementById('output');
         const inputField = document.getElementById('code-input');
+        const stopButton = document.getElementById('stop-btn');
         let pendingInputResolve = null;
         let pendingInputType = 'text';
+        let pendingInputAllowStop = false;
         
 
         function triggerDownload(filename, content, mimeType = 'text/plain') {
@@ -72,9 +77,11 @@
             pendingInputResolve(value);
             pendingInputResolve = null;
             pendingInputType = 'text';
+            pendingInputAllowStop = false;
             inputField.value = '';
             inputField.type = 'text';
             runButton.textContent = 'Run';
+            stopButton.style.display = 'none';
             printToConsole(`&gt;&gt;&gt; ${value}`, "#fff");
             return true;
         }
@@ -192,26 +199,28 @@
                 micropip.destroy();
                 printToConsole("Configuring Python input...<br>", "#e6a23c");
 
-                function requestConsoleInput(promptText, inputType) {
+                function requestConsoleInput(promptText, inputType, allowStop) {
                     const label = promptText ? String(promptText) : "";
                     if (label) {
                         printToConsole(`<br>${label}`, "#e6a23c");
                     }
                     inputField.type = inputType;
                     pendingInputType = inputType;
+                    pendingInputAllowStop = allowStop;
                     inputField.disabled = false;
                     runButton.disabled = false;
                     runButton.textContent = 'Entrer';
+                    stopButton.style.display = allowStop ? 'inline-block' : 'none';
                     inputField.focus();
                     return new Promise((resolve) => {
                         pendingInputResolve = resolve;
                     });
                 }
 
-                window.promptUserConsoleAsync = (promptText) =>
-                    requestConsoleInput(promptText, "text");
-                window.promptDateConsoleAsync = (promptText) =>
-                    requestConsoleInput(promptText, "date");
+                window.promptUserConsoleAsync = (promptText, allowStop) =>
+                    requestConsoleInput(promptText, "text", allowStop);
+                window.promptDateConsoleAsync = (promptText, allowStop) =>
+                    requestConsoleInput(promptText, "date", allowStop);
 
                 pyodide.runPython(`
                     import builtins
@@ -346,6 +355,10 @@ from ics.alarm.email import EmailAlarm
             if (submitPendingInput()) return;
             const enterEvent = new KeyboardEvent('keydown', { key: 'Enter' });
             inputField.dispatchEvent(enterEvent);
+        });
+
+        stopButton.addEventListener('click', () => {
+            if (pendingInputAllowStop) submitPendingInput('stop');
         });
     </script>
 </body>

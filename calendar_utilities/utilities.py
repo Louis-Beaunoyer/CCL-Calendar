@@ -1,12 +1,12 @@
 import datetime
 from datetime import time
 
-async def ainput(prompt_text=""):
+async def ainput(prompt_text="", allow_stop=False):
     window = __import__("js").window
     if "date" in prompt_text.lower() or "aaaa" in prompt_text.lower():
-        value = await window.promptDateConsoleAsync(prompt_text)
+        value = await window.promptDateConsoleAsync(prompt_text, allow_stop)
         return str(value).replace("-", "/")
-    return str(await window.promptUserConsoleAsync(prompt_text))
+    return str(await window.promptUserConsoleAsync(prompt_text, allow_stop))
 
 class Dayoff:
     def __init__(self,name,date):
@@ -97,12 +97,12 @@ async def askForInvertedDays():
     i = 1
     while True:
         print('Pour arrêter de rentrer des dates, entrez "stop"')
-        date = await ainput('Date (format: AAAA/MM/JJ): ')
+        date = await ainput('Date (format: AAAA/MM/JJ): ', True)
         if date == 'stop':
             break
         date = date.replace('/', '')
         date = datetime.datetime.strptime(date, '%Y%m%d')
-        dayNumber = await ainput('Jour: ')
+        dayNumber = await ainput('Jour: ', True)
         if dayNumber == 'stop':
             break
         i = i + 1
@@ -113,15 +113,15 @@ async def askForBreaks():
     breaks_list = []
     while True:
         print('Pour arrêter d\'entrer des relâches, entrez "stop"')
-        name = await ainput("Entrez le nom de la relâche: ")
+        name = await ainput("Entrez le nom de la relâche: ", True)
         if name.lower() == 'stop':
             break
-        start = await ainput('Entrez la date de debut de la relâche (format: AAAA/MM/JJ): ')
+        start = await ainput('Entrez la date de debut de la relâche (format: AAAA/MM/JJ): ', True)
         if start.lower() == 'stop':
             break
         start = start.replace('/', '')
         start = datetime.date.strptime(start, '%Y%m%d')
-        end = await ainput('Entrez la date de fin de la relâche (format: AAAA/MM/JJ): ')
+        end = await ainput('Entrez la date de fin de la relâche (format: AAAA/MM/JJ): ', True)
         if end.lower() == 'stop':
             break
         end = end.replace('/', '')
@@ -135,7 +135,7 @@ async def askForDaysOff():
     days_off_list = []
     while True:
         print('Pour arrêter d\'entrer des congés, entrez "stop"')
-        date = await ainput('Entrez la date de debut de la journée pédagogique (format: AAAA/MM/JJ): ')
+        date = await ainput('Entrez la date de debut de la journée pédagogique (format: AAAA/MM/JJ): ', True)
         if date.lower() == 'stop':
             break
         else:
@@ -145,6 +145,7 @@ async def askForDaysOff():
         while True:
             name = (await ainput("Entrez 'f' pour une journée flottante, 'c' pour un congé férié et 'p' pour une journée pédagogique: ")).lower()
             if name not in {'f', 'c', 'p'}:
+                if name.lower() == 'stop': break 
                 continue
             else:
                 if name == 'f':
@@ -180,5 +181,4 @@ def isFriday(date:datetime.date) -> bool:
         return True
     else:
         return False
-
 
