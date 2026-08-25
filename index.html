@@ -201,16 +201,18 @@
 
                 function requestConsoleInput(promptText, inputType, allowStop) {
                     const label = promptText ? String(promptText) : "";
+                    const canStop = allowStop === true ||
+                        String(allowStop).toLowerCase() === "true";
                     if (label) {
                         printToConsole(`<br>${label}`, "#e6a23c");
                     }
                     inputField.type = inputType;
                     pendingInputType = inputType;
-                    pendingInputAllowStop = allowStop;
+                    pendingInputAllowStop = canStop;
                     inputField.disabled = false;
                     runButton.disabled = false;
                     runButton.textContent = 'Entrer';
-                    stopButton.style.display = allowStop ? 'inline-block' : 'none';
+                    stopButton.style.display = canStop ? 'inline-block' : 'none';
                     inputField.focus();
                     return new Promise((resolve) => {
                         pendingInputResolve = resolve;
