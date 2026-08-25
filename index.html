@@ -235,12 +235,12 @@
                 // Load the actual project modules into the in-browser filesystem.
                 printToConsole("Loading calendar package files...<br>", "#e6a23c");
                 const icsFiles = [
-                    'ics/__init__.py', 'ics/__meta__.py', 'ics/attendee.py', 'ics/component.py',
+                    'ics/attendee.py', 'ics/component.py',
                     'ics/event.py', 'ics/icalendar.py', 'ics/timeline.py', 'ics/todo.py', 'ics/tools.py',
                     'ics/types.py', 'ics/utils.py',
-                    'ics/alarm/__init__.py', 'ics/alarm/audio.py', 'ics/alarm/base.py', 'ics/alarm/custom.py',
+                    'ics/alarm/audio.py', 'ics/alarm/base.py', 'ics/alarm/custom.py',
                     'ics/alarm/display.py', 'ics/alarm/email.py', 'ics/alarm/none.py', 'ics/alarm/utils.py',
-                    'ics/grammar/__init__.py', 'ics/grammar/contentline.ebnf', 'ics/grammar/contentline.py',
+                    'ics/grammar/contentline.ebnf', 'ics/grammar/contentline.py',
                     'ics/grammar/parse.py',
                     'ics/parsers/alarm_parser.py', 'ics/parsers/attendee_parser.py',
                     'ics/parsers/event_parser.py', 'ics/parsers/icalendar_parser.py', 'ics/parsers/parser.py',
@@ -252,8 +252,31 @@
                 ];
 
                 try { pyodide.FS.mkdir('ics'); } catch (e) {}
+                try { pyodide.FS.mkdir('ics/alarm'); } catch (e) {}
+                try { pyodide.FS.mkdir('ics/grammar'); } catch (e) {}
                 try { pyodide.FS.mkdir('ics/parsers'); } catch (e) {}
                 try { pyodide.FS.mkdir('ics/serializers'); } catch (e) {}
+                pyodide.FS.writeFile('ics/__meta__.py', `
+__title__ = "ics"
+__version__ = "0.7.3"
+__author__ = "Nikita Marchant"
+__license__ = "Apache License, Version 2.0"
+__copyright__ = "Copyright 2013-2020 Nikita Marchant and individual contributors"
+`);
+                pyodide.FS.writeFile('ics/__init__.py', `
+from .__meta__ import (__author__, __copyright__, __license__, __title__, __version__)
+from .alarm import AudioAlarm, DisplayAlarm
+from .attendee import Attendee, Organizer
+from .event import Event, Geo
+from .icalendar import Calendar
+from .todo import Todo
+`);
+                pyodide.FS.writeFile('ics/alarm/__init__.py', `
+from ics.alarm.audio import AudioAlarm
+from ics.alarm.display import DisplayAlarm
+from ics.alarm.email import EmailAlarm
+`);
+                pyodide.FS.writeFile('ics/grammar/__init__.py', '');
                 pyodide.FS.writeFile('ics/parsers/__init__.py', '');
                 pyodide.FS.writeFile('ics/serializers/__init__.py', '');
 
