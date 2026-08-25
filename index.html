@@ -36,6 +36,7 @@
         const runButton = document.getElementById('run-btn');
         const outputDiv = document.getElementById('output');
         const inputField = document.getElementById('code-input');
+        let pendingInputResolve = null;
 
         function setupStdout() {
             pyodide.runPython(`
@@ -150,25 +151,23 @@
                 micropip.destroy();
                 printToConsole("Configuring Python input...<br>", "#e6a23c");
 
-                // Required so the browser can prompt for input during script execution.
-                window.promptUserConsole = function(promptText) {
+                window.promptUserConsoleAsync = function(promptText) {
                     const label = promptText ? String(promptText) : "";
                     if (label) {
-                        printToConsole(`<br><span style="color: #e6a23c;">${label}</span>`);
+                        printToConsole(`<br>${label}`, "#e6a23c");
                     }
-
-                    const userInput = prompt(label) ?? "";
-                    if (userInput) {
-                        printToConsole(`<span style="color: #ffffff;"> ${userInput}</span>`);
-                    }
-                    return userInput;
+                    inputField.disabled = false;
+                    inputField.focus();
+                    return new Promise((resolve) => {
+                        pendingInputResolve = resolve;
+                    });
                 };
 
                 pyodide.runPython(`
                     import builtins
                     from js import window
-                    def custom_input(prompt_text=""):
-                        return str(window.promptUserConsole(prompt_text))
+                    async def custom_input(prompt_text=""):
+                        return str(await window.promptUserConsoleAsync(prompt_text))
                     builtins.input = custom_input
                 `);
 
@@ -250,6 +249,14 @@
             if (e.key === 'Enter') {
                 const code = inputField.value;
                 if (!code.trim()) return;
+
+                if (pendingInputResolve) {
+                    pendingInputResolve(code);
+                    pendingInputResolve = null;
+                    inputField.value = '';
+                    printToConsole(`&gt;&gt;&gt; ${code}`, "#fff");
+                    return;
+                }
 
                 printToConsole(`<br><span style="color: #00ff00;">&gt;&gt;&gt; ${code}</span>`);
                 inputField.value = '';

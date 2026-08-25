@@ -3,13 +3,13 @@ import ics
 
 
 
-yearDateLimits = askForYearDateLimits()
-breaks:list = askForBreaks() #list of objects
-daysOff:list = askForDaysOff() #list of objects
-invertedDays:list[dict[datetime.date, int]] = askForInvertedDays() #list of dicts
+yearDateLimits = await askForYearDateLimits()
+breaks:list = await askForBreaks() #list of objects
+daysOff:list = await askForDaysOff() #list of objects
+invertedDays:list[dict[datetime.date, int]] = await askForInvertedDays() #list of dicts
 
-hours, cycle = hour_selection() #list of lists
-classesSchedule:list[object] = day_classes() #list of objects
+hours, cycle = await hour_selection() #list of lists
+classesSchedule:list[object] = await day_classes() #list of objects
 
 daysInSchoolYear = abs((yearDateLimits[1] - yearDateLimits[0]).days+1)
 eventList = []
@@ -104,4 +104,3 @@ for event in eventList:
 
 with open('calendar.ics', 'w') as file:
     file.writelines(c.serialize())
-

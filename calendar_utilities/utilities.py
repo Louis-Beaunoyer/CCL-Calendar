@@ -1,6 +1,10 @@
 import datetime
 from datetime import time
 
+async def ainput(prompt_text=""):
+    window = __import__("js").window
+    return str(await window.promptUserConsoleAsync(prompt_text))
+
 class Dayoff:
     def __init__(self,name,date):
         self.name = name
@@ -34,16 +38,15 @@ class Event:
         self.isAllDay = isAllDay
 
 
-def askForCycle()-> int:
+async def askForCycle()-> int:
     while True:
-        cycle = int(input('Cycle (1 ou 2): '))
+        cycle = int(await ainput('Cycle (1 ou 2): '))
         if cycle != 1 and cycle != 2:
             print('Veuillez entrer un cycle valide (1 ou 2)')
-        else: break
-        return cycle
-    return cycle
+        else:
+            return cycle
 
-def hour_selection():
+async def hour_selection():
     cycle1_start = [time(9,30), time(10,57), time(12,19), time(13,15), time(14,37), time(15,3)]
     cycle1_end = [time(10,52),time(12,19),time(13,15),time(14,37),time(15,3),time(16,25)]
     cycle1_friday_start = [time(9,30),time(10,19),time(11,8),time(11,52),time(12,32)]
@@ -53,7 +56,7 @@ def hour_selection():
     cycle2_friday_start = [time(9,30),time(10,19),time(11,3),time(11,43),time(12,32)]
     cycle2_friday_end = [time(10,14),time(11,3),time(11,43),time(12,27),time(13,16)]
     hours = []
-    cycle = askForCycle()
+    cycle = await askForCycle()
     if cycle == 1:
 
         hours.append(cycle1_start)
@@ -68,48 +71,54 @@ def hour_selection():
     return hours, cycle
 
 
-def day_classes():
+async def day_classes():
     days_list = []
-    def ask_schedule(class_number,day):
-        return str(input(f'Quelle est la classe dans la plage horaire {class_number} le jour {day}?\n'))
+    async def ask_schedule(class_number,day):
+        return await ainput(f'Quelle est la classe dans la plage horaire {class_number} le jour {day}?\n')
 
     for day in range(9):
         day = day + 1
-        day_obj = Day(day, ask_schedule(1, day), ask_schedule(2, day), ask_schedule(3, day), ask_schedule(4, day))
+        day_obj = Day(
+            day,
+            await ask_schedule(1, day),
+            await ask_schedule(2, day),
+            await ask_schedule(3, day),
+            await ask_schedule(4, day),
+        )
         days_list.append(day_obj)
 
     return days_list
 
-def askForInvertedDays():
+async def askForInvertedDays():
     inverted_days = []
     i = 1
     while True:
         print('Pour arrêter de rentrer des dates, entrez "stop"')
-        date = input('Date (format: AAAA/MM/JJ): ')
+        date = await ainput('Date (format: AAAA/MM/JJ): ')
         if date == 'stop':
             break
         date = date.replace('/', '')
         date = datetime.datetime.strptime(date, '%Y%m%d')
-        dayNumber = input('Jour: ')
+        dayNumber = await ainput('Jour: ')
         if dayNumber == 'stop':
             break
         i = i + 1
         inverted_days.append({'date': date, 'dayNumber': dayNumber})
     return inverted_days
 
-def askForBreaks():
+async def askForBreaks():
     breaks_list = []
     while True:
         print('Pour arrêter d\'entrer des relâches, entrez "stop"')
-        name = input("Entrez le nom de la relâche: ")
+        name = await ainput("Entrez le nom de la relâche: ")
         if name.lower() == 'stop':
             break
-        start = input('Entrez la date de debut de la relâche (format: AAAA/MM/JJ): ')
+        start = await ainput('Entrez la date de debut de la relâche (format: AAAA/MM/JJ): ')
         if start.lower() == 'stop':
             break
         start = start.replace('/', '')
         start = datetime.date.strptime(start, '%Y%m%d')
-        end = input('Entrez la date de fin de la relâche (format: AAAA/MM/JJ): ')
+        end = await ainput('Entrez la date de fin de la relâche (format: AAAA/MM/JJ): ')
         if end.lower() == 'stop':
             break
         end = end.replace('/', '')
@@ -119,11 +128,11 @@ def askForBreaks():
     return breaks_list
 
 
-def askForDaysOff():
+async def askForDaysOff():
     days_off_list = []
     while True:
         print('Pour arrêter d\'entrer des congés, entrez "stop"')
-        date = input('Entrez la date de debut de la journée pédagogique (format: AAAA/MM/JJ): ')
+        date = await ainput('Entrez la date de debut de la journée pédagogique (format: AAAA/MM/JJ): ')
         if date.lower() == 'stop':
             break
         else:
@@ -131,7 +140,7 @@ def askForDaysOff():
             date = datetime.date.strptime(date, '%Y%m%d')
 
         while True:
-            name = input("Entrez 'f' pour une journée flottante, 'c' pour un congé férié et 'p' pour une journée pédagogique: ").lower()
+            name = (await ainput("Entrez 'f' pour une journée flottante, 'c' pour un congé férié et 'p' pour une journée pédagogique: ")).lower()
             if name not in {'f', 'c', 'p'}:
                 continue
             else:
@@ -143,16 +152,16 @@ def askForDaysOff():
                     name = 'Journée pédagogique'
                 break
 
-            day = Dayoff(name,date)
-            days_off_list.append(day)
+                day = Dayoff(name,date)
+                days_off_list.append(day)
     return days_off_list
 
-def askForYearDateLimits():
+async def askForYearDateLimits():
     while True:
-        start = input('Entrez la date de debut de l\'année scolaire (format: AAAA/MM/JJ): ')
+        start = await ainput('Entrez la date de debut de l\'année scolaire (format: AAAA/MM/JJ): ')
         start = start.replace('/', '')
         start = datetime.date.strptime(start, '%Y%m%d')
-        end = input('Entrez la date de fin de l\'année scolaire (format: AAAA/MM/JJ): ')
+        end = await ainput('Entrez la date de fin de l\'année scolaire (format: AAAA/MM/JJ): ')
         end = end.replace('/', '')
         end = datetime.date.strptime(end, '%Y%m%d')
         return start, end
@@ -168,7 +177,6 @@ def isFriday(date:datetime.date) -> bool:
         return True
     else:
         return False
-
 
 
 
