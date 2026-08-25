@@ -67,10 +67,11 @@
 
         window.downloadFile = triggerDownload;
 
-        function submitPendingInput() {
-            if (!pendingInputResolve || !inputField.value.trim()) return false;
+        function submitPendingInput(forcedValue = null) {
+            if (!pendingInputResolve) return false;
 
-            const rawValue = inputField.value;
+            const rawValue = forcedValue ?? inputField.value;
+            if (!rawValue.trim()) return false;
             const value = pendingInputType === 'date'
                 ? rawValue.replace(/-/g, '/')
                 : rawValue;
