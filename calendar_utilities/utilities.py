@@ -43,7 +43,7 @@ class Event:
         self.isAllDay = isAllDay
 
 
-async def askForCycle():
+async def askForCycle(): #
     while True:
         cycle = await ainput('Cycle (1 ou 2): ')
         if isinstance(cycle, str) and cycle.isdigit():
