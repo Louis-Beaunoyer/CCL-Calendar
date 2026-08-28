@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://pypi.org https://files.pythonhosted.org; img-src 'self' data:; object-src 'none'; base-uri 'none';">
     <title>Web Python Console</title>
     <!-- Load Pyodide -->
     <script src="./pyodide/pyodide.js"></script>
@@ -83,7 +84,7 @@
             inputField.type = 'text';
             runButton.textContent = 'Run';
             stopButton.style.display = 'none';
-            printToConsole(`&gt;&gt;&gt; ${value}`, "#fff");
+            printToConsole(`>>> ${value}`, "#fff");
             return true;
         }
 
@@ -95,8 +96,15 @@
             `);
         }
         function printToConsole(text, color = "#fff") {
-            const message = String(text).replace(/\n/g, '<br>');
-            outputDiv.innerHTML += `<span style="color: ${color};">${message}</span>`;
+            const span = document.createElement('span');
+            span.style.color = color;
+            const lines = String(text).split('\n');
+            lines.forEach((line, index) => {
+                if (index > 0) span.appendChild(document.createElement('br'));
+                span.appendChild(document.createTextNode(line));
+            });
+            outputDiv.appendChild(span);
+            outputDiv.appendChild(document.createElement('br'));
             const consoleDiv = document.getElementById('console');
             consoleDiv.scrollTop = consoleDiv.scrollHeight;
         }
@@ -176,15 +184,16 @@
                 }
 
                 pyodide = await loadPyodide({ indexURL: "./pyodide/" });
-                printToConsole("Python environment loaded successfully!<br>", "#00ff00");
-                printToConsole("Loading bundled Python dependencies...<br>", "#e6a23c");
+                printToConsole("Python environment loaded successfully!", "#00ff00");
+                printToConsole("Loading bundled Python dependencies...", "#e6a23c");
                 const bundledPackages = [
                     "attrs-26.1.0-py3-none-any.whl",
                     "python_dateutil-2.9.0.post0-py2.py3-none-any.whl",
-                    "six-1.17.0-py2.py3-none-any.whl"
+                    "six-1.17.0-py2.py3-none-any.whl",
+                    "tzdata-2025.3-py2.py3-none-any.whl"
                 ].map((filename) => new URL(`./pyodide/${filename}`, document.baseURI).href);
                 await pyodide.loadPackage(bundledPackages);
-                printToConsole("Loading calendar parser dependencies...<br>", "#e6a23c");
+                printToConsole("Loading calendar parser dependencies...", "#e6a23c");
                 const micropipUrl = new URL(
                     "./pyodide/micropip-0.11.1-py3-none-any.whl",
                     document.baseURI
@@ -198,14 +207,14 @@
                 }
                 await micropip.install(["arrow", "tatsu==4.4.0"]);
                 micropip.destroy();
-                printToConsole("Configuring Python input...<br>", "#e6a23c");
+                printToConsole("Configuring Python input...", "#e6a23c");
 
                 function requestConsoleInput(promptText, inputType, allowStop) {
                     const label = promptText ? String(promptText) : "";
                     const canStop = allowStop === true ||
                         String(allowStop).toLowerCase() === "true";
                     if (label) {
-                        printToConsole(`<br>${label}`, "#e6a23c");
+                        printToConsole(`\n${label}`, "#e6a23c");
                     }
                     inputField.type = inputType;
                     pendingInputType = inputType;
@@ -245,7 +254,7 @@
                 `);
 
                 // Load the actual project modules into the in-browser filesystem.
-                printToConsole("Loading calendar package files...<br>", "#e6a23c");
+                printToConsole("Loading calendar package files...", "#e6a23c");
                 const icsFiles = [
                     'ics/attendee.py', 'ics/component.py',
                     'ics/event.py', 'ics/icalendar.py', 'ics/timeline.py', 'ics/todo.py', 'ics/tools.py',
@@ -293,7 +302,7 @@ from ics.alarm.email import EmailAlarm
                 pyodide.FS.writeFile('ics/serializers/__init__.py', '');
 
                 for (const [index, relPath] of icsFiles.entries()) {
-                    printToConsole(`Loading ${index + 1}/${icsFiles.length}: ${relPath}<br>`, "#888");
+                    printToConsole(`Loading ${index + 1}/${icsFiles.length}: ${relPath}`, "#888");
                     const parts = relPath.split('/');
                     let dirPath = '';
                     for (let i = 0; i < parts.length - 1; i++) {
@@ -304,7 +313,7 @@ from ics.alarm.email import EmailAlarm
                     pyodide.FS.writeFile(relPath, await fetchText(relPath));
                 }
 
-                printToConsole("Loading calendar utilities...<br>", "#e6a23c");
+                printToConsole("Loading calendar utilities...", "#e6a23c");
                 try { pyodide.FS.mkdir('calendar_utilities'); } catch (e) {}
                 pyodide.FS.writeFile('calendar_utilities/__init__.py', '');
 
@@ -312,52 +321,32 @@ from ics.alarm.email import EmailAlarm
 
                 const pythonCode = await fetchText('main/setup.py');
 
-                printToConsole("Running setup.py...<br><br>", "#e6a23c");
+                printToConsole("Running setup.py...\n", "#e6a23c");
                 setupStdout();
                 await pyodide.runPythonAsync(pythonCode);
 
                 const stdout = pyodide.runPython("sys.stdout.getvalue()");
                 if (stdout) printToConsole(stdout);
-                printToConsole("<br>--- Script finished execution. Console is ready ---<br>", "#00ff00");
+                printToConsole("\n--- Script finished execution. Console is ready ---", "#00ff00");
 
                 inputField.disabled = false;
                 runButton.disabled = false;
                 if (window.innerWidth > 768) inputField.focus();
             } catch (err) {
-                printToConsole(`<br><span style="color: #ff0000;">${formatError(err)}</span>`, "#ff0000");
+                printToConsole(`\n${formatError(err)}`, "#ff0000");
             }
         }
 
         main();
 
-        inputField.addEventListener('keydown', async (e) => {
+        inputField.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
-                const code = inputField.value;
-                if (!code.trim()) return;
-
-                if (submitPendingInput()) return;
-
-                printToConsole(`<br><span style="color: #00ff00;">&gt;&gt;&gt; ${code}</span>`);
-                inputField.value = '';
-
-                try {
-                    setupStdout();
-                    const result = await pyodide.runPythonAsync(code);
-                    const stdout = pyodide.runPython("sys.stdout.getvalue()");
-                    if (stdout) printToConsole(`<br>${stdout}`);
-                    if (result !== undefined) {
-                        printToConsole(`<br><span style="color: #a6e22e;">${result}</span>`);
-                    }
-                } catch (err) {
-                    printToConsole(`<br><span style="color: #ff0000;">${formatError(err)}</span>`);
-                }
+                submitPendingInput();
             }
         });
 
         runButton.addEventListener('click', () => {
-            if (submitPendingInput()) return;
-            const enterEvent = new KeyboardEvent('keydown', { key: 'Enter' });
-            inputField.dispatchEvent(enterEvent);
+            submitPendingInput();
         });
 
         stopButton.addEventListener('click', () => {

@@ -1,6 +1,6 @@
 from calendar_utilities.utilities import *
 import ics
-
+from zoneinfo import ZoneInfo as tmz
 
 
 yearDateLimits = await askForYearDateLimits()
@@ -15,29 +15,36 @@ daysInSchoolYear = abs((yearDateLimits[1] - yearDateLimits[0]).days+1)
 eventList = []
 
 i = 0
-modifier = datetime.timedelta(days=0)
 dayNumberIncrement = 1
-while i <= daysInSchoolYear:
-    currentDate = yearDateLimits[0] + datetime.timedelta(days=i) + modifier
-    if dayNumberIncrement <= 10:
+while i < daysInSchoolYear:
+    currentDate = yearDateLimits[0] + datetime.timedelta(days=i)
+    if dayNumberIncrement > len(classesSchedule):
         dayNumberIncrement = 1
 
     if isWeekend(currentDate):
+        i = i + 1
         continue
 
+    for break_obj in breaks:
+        if break_obj.endDate > yearDateLimits[1]:
+            break_obj.endDate = yearDateLimits[1]
 
     breaksStartDays = [break_obj.startDate for break_obj in breaks]
     if currentDate in breaksStartDays:
         startDate = None
         endDate = None
         name = None
-        isAllDay = True
         for break_obj in breaks:
             if currentDate == break_obj.startDate:
                 name, startDate, endDate = break_obj.name, break_obj.startDate, break_obj.endDate
-        event = Event(name, startDate, endDate, isAllDay)
+        event = Event(
+            name,
+            datetime.datetime.combine(startDate, datetime.time()),
+            datetime.datetime.combine(endDate, datetime.time()),
+            True,
+        )
         eventList.append(event)
-        modifier = modifier + abs(endDate - startDate)
+        i = i + 1 + (endDate - startDate).days
         continue
 
 
@@ -45,23 +52,27 @@ while i <= daysInSchoolYear:
     if currentDate in daysOffDates:
         startDate = None
         name = None
-        isAllDay = True
         for day_off_obj in daysOff:
             if currentDate == day_off_obj.date:
                 name, startDate= day_off_obj.name, day_off_obj.date
-        event = Event(name, startDate, isAllDay)
+        event = Event(
+            name,
+            datetime.datetime.combine(startDate, datetime.time()),
+            datetime.datetime.combine(startDate, datetime.time()),
+            True,
+        )
         eventList.append(event)
+        i = i +1
         continue
 
 
 
     tempDayNumberIncrement = dayNumberIncrement
 
-    invertedDaysKeys: list = [invertedDaysItem.keys() for invertedDaysItem in invertedDays]
-    if currentDate in invertedDaysKeys:
-        for invertedDaysItem in invertedDays:
-            if currentDate == invertedDaysItem.keys():
-                tempDayNumberIncrement = invertedDaysItem['dayNumber']
+    for invertedDaysItem in invertedDays:
+        if currentDate == invertedDaysItem['date'].date():
+            tempDayNumberIncrement = int(invertedDaysItem["dayNumber"])
+
 
 
 
@@ -72,19 +83,53 @@ while i <= daysInSchoolYear:
         startTimes = hours[0]
         endTimes = hours[1]
 
-    lunch = Event('Diner',startTimes[2],endTimes[2],False)
-    dayNumber = Event(f'Jour {tempDayNumberIncrement}',currentDate,currentDate,True)
-    class1 = Event(classesSchedule[tempDayNumberIncrement-1],startTimes[0],endTimes[0],False)
-    class2 = Event(classesSchedule[tempDayNumberIncrement-1],startTimes[1],endTimes[1],False)
+    startTimes = [
+        datetime.datetime.combine(currentDate, hour)
+        for hour in startTimes
+    ]
+    endTimes = [
+        datetime.datetime.combine(currentDate, hour)
+        for hour in endTimes
+    ]
+
+    currentDateTime = datetime.datetime.combine(currentDate, datetime.time())
+    dayNumber = Event(
+        f'Jour {tempDayNumberIncrement}',
+        currentDateTime,
+        currentDateTime,
+        True,
+    )
+    class1 = Event(classesSchedule[tempDayNumberIncrement-1].class1,startTimes[0],endTimes[0],False)
+
     if cycle == 1:
-        class3 = Event(classesSchedule[tempDayNumberIncrement-1], startTimes[3], endTimes[3], False)
-        class4 = Event(classesSchedule[tempDayNumberIncrement-1],startTimes[4],endTimes[4],False)
+        class2 = Event(classesSchedule[tempDayNumberIncrement-1].class2,startTimes[1],endTimes[1],False)
+
+        if isFriday(currentDate):
+            lunch = Event('Diner',startTimes[3],endTimes[3],False)
+            class3 = Event(classesSchedule[tempDayNumberIncrement - 1].class3, startTimes[2], endTimes[2], False)
+            class4 = Event(classesSchedule[tempDayNumberIncrement-1].class4,startTimes[4],endTimes[4],False)
+        else:
+            lunch = Event('Diner', startTimes[2], endTimes[2], False)
+            class3 = Event(classesSchedule[tempDayNumberIncrement-1].class3, startTimes[3], endTimes[3], False)
+            class4 = Event(classesSchedule[tempDayNumberIncrement - 1].class4, startTimes[4], endTimes[4], False)
         eventList.extend([class1, class2,lunch, class3, class4])
     else:
-        class3a = Event(classesSchedule[tempDayNumberIncrement - 1], startTimes[3], endTimes[3], False)
-        class3b = Event(classesSchedule[tempDayNumberIncrement - 1], startTimes[4], endTimes[4], False)
-        class4 = Event(classesSchedule[tempDayNumberIncrement - 1], startTimes[5], endTimes[5], False)
-        eventList.extend([class1,class2,class3a,lunch, class3b, class4])
+
+        if isFriday(currentDate):
+            lunch = Event('Diner',startTimes[2],endTimes[2],False)
+            class2 = Event(classesSchedule[tempDayNumberIncrement - 1].class2, startTimes[1], endTimes[1], False)
+            class3 = Event(classesSchedule[tempDayNumberIncrement - 1].class3, startTimes[3], endTimes[3], False)
+            class4 = Event(classesSchedule[tempDayNumberIncrement-1].class4,startTimes[4],endTimes[4],False)
+            eventList.extend([class1, class2, lunch, class3, class4])
+        else:
+            lunch = Event('Diner', startTimes[3], endTimes[3], False)
+            class2 = Event(classesSchedule[tempDayNumberIncrement - 1].class2, startTimes[1], endTimes[1], False)
+            class3a = Event(classesSchedule[tempDayNumberIncrement-1].class3, startTimes[2], endTimes[2], False)
+            class3b = Event(classesSchedule[tempDayNumberIncrement - 1].class3, startTimes[4], endTimes[4], False)
+            class4 = Event(classesSchedule[tempDayNumberIncrement - 1].class4, startTimes[5], endTimes[5], False)
+            eventList.extend([class1, class2, class3a, lunch, class3b, class4])
+
+    eventList.append(dayNumber)
 
 
 
@@ -92,14 +137,18 @@ while i <= daysInSchoolYear:
     dayNumberIncrement = dayNumberIncrement + 1
     i = i + 1
 
-e = ics.Event()
+timezone = tmz("America/Toronto")
 c = ics.Calendar()
 for event in eventList:
+    e = ics.Event()
     e.name = event.name
-    e.begin = event.dtstart
-    e.end = event.dtend
     if event.isAllDay:
+        e.begin = event.dtstart
+        e.end = event.dtend
         e.make_all_day()
+    else:
+        e.begin = event.dtstart.replace(tzinfo=timezone)
+        e.end = event.dtend.replace(tzinfo=timezone)
     c.events.add(e)
 
 calendar_data = c.serialize()
