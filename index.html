@@ -207,6 +207,13 @@
                     "./pyodide/tzdata-2025.3-py2.py3-none-any.whl",
                     document.baseURI
                 ).href;
+                const tzdataResponse = await fetch(tzdataUrl, { method: "HEAD" });
+                if (!tzdataResponse.ok) {
+                    throw new Error(
+                        `Timezone data failed to load (${tzdataResponse.status}). ` +
+                        "Commit and deploy pyodide/tzdata-2025.3-py2.py3-none-any.whl."
+                    );
+                }
                 await micropip.install(["arrow", "tatsu==4.4.0", tzdataUrl]);
                 micropip.destroy();
                 printToConsole("Configuring Python input...", "#e6a23c");
