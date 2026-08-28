@@ -90,11 +90,9 @@
         }
 
         function setupStdout() {
-            pyodide.runPython(`
-            import sys
-            import io
-            sys.stdout = io.StringIO()
-            `);
+            pyodide.setStdout({
+                batched: (text) => printToConsole(text)
+            });
         }
         function printToConsole(text, color = "#fff") {
             const span = document.createElement('span');
@@ -190,8 +188,7 @@
                 const bundledPackages = [
                     "attrs-26.1.0-py3-none-any.whl",
                     "python_dateutil-2.9.0.post0-py2.py3-none-any.whl",
-                    "six-1.17.0-py2.py3-none-any.whl",
-                    "tzdata-2025.3-py2.py3-none-any.whl"
+                    "six-1.17.0-py2.py3-none-any.whl"
                 ].map((filename) => new URL(`./pyodide/${filename}`, document.baseURI).href);
                 await pyodide.loadPackage(bundledPackages);
                 printToConsole("Loading calendar parser dependencies...", "#e6a23c");
@@ -206,7 +203,11 @@
                 } catch (error) {
                     // Tatsu is not installed on the first run.
                 }
-                await micropip.install(["arrow", "tatsu==4.4.0"]);
+                const tzdataUrl = new URL(
+                    "./pyodide/tzdata-2025.3-py2.py3-none-any.whl",
+                    document.baseURI
+                ).href;
+                await micropip.install(["arrow", "tatsu==4.4.0", tzdataUrl]);
                 micropip.destroy();
                 printToConsole("Configuring Python input...", "#e6a23c");
 
@@ -326,8 +327,6 @@ from ics.alarm.email import EmailAlarm
                 setupStdout();
                 await pyodide.runPythonAsync(pythonCode);
 
-                const stdout = pyodide.runPython("sys.stdout.getvalue()");
-                if (stdout) printToConsole(stdout);
                 printToConsole("\n--- Script finished execution. Console is ready ---", "#00ff00");
 
                 inputField.disabled = false;

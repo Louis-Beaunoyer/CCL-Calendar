@@ -144,7 +144,7 @@ async def askForBreaks():
         start = start.replace('/', '')
         start = datetime.datetime.strptime(start, '%Y%m%d').date()
         if isWeekend(start):
-            print("Une relâche ne peut pas commencer dans une fin de semaine.Veuillez rentrer le nom de la relâche et essayer à nouveau.")
+            print("Une relâche ne peut pas commencer dans une fin de semaine. Veuillez rentrer le nom de la relâche et essayer à nouveau.")
             continue
         end = await ainput('Entrez la date de fin de la relâche (format: AAAA/MM/JJ): ', True)
         if end.lower() == 'stop':
@@ -204,7 +204,7 @@ async def askForYearDateLimits():
         end = end.replace('/', '')
         end = datetime.datetime.strptime(end, '%Y%m%d').date()
         if end - start <= datetime.timedelta(0):
-            print("L'année ne peut pas finir avant qu'elle n'ait commencer ni finir sur la même journée.Ressayer à nouveau.")
+            print("L'année ne peut pas finir avant qu'elle n'ait commencer ni finir sur la même journée. Ressayer à nouveau.")
             continue
         return start, end
 
