@@ -151,7 +151,7 @@ async def askForBreaks():
             break
         end = end.replace('/', '')
         end = datetime.datetime.strptime(end, '%Y%m%d').date()
-        if end - start <= 0:
+        if end - start <= datetime.timedelta(0):
             print("La date de fin de la relâche ne peut pas etre sur la même journée ni avant la date de début, si la relâche dure seulement une journée inserer la date lors de l'étape des journées pédagogiques. Veuiller rentrer le nom et la date de début de la relâche et essayer à nouveau.")
             continue
         b = Breaks(name, start, end)
