@@ -151,7 +151,7 @@ async def askForBreaks():
             break
         end = end.replace('/', '')
         end = datetime.datetime.strptime(end, '%Y%m%d').date()
-        if end - start <= datetime.timedelta(0):
+        if end <= start:
             print("La date de fin de la relâche ne peut pas etre sur la même journée ni avant la date de début, si la relâche dure seulement une journée inserer la date lors de l'étape des journées pédagogiques. Veuiller rentrer le nom et la date de début de la relâche et essayer à nouveau.")
             continue
         b = Breaks(name, start, end)
@@ -203,7 +203,7 @@ async def askForYearDateLimits():
         end = await ainput('Entrez la date de fin de l\'année scolaire (format: AAAA/MM/JJ): ')
         end = end.replace('/', '')
         end = datetime.datetime.strptime(end, '%Y%m%d').date()
-        if end - start <= datetime.timedelta(0):
+        if end <= start:
             print("L'année ne peut pas finir avant qu'elle n'ait commencer ni finir sur la même journée. Ressayer à nouveau.")
             continue
         return start, end
